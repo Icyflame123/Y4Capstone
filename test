@@ -1,0 +1,27 @@
+import pandas as pd
+import fastai
+from fastai import *
+from fastai.text import * 
+#from google.colab import drive
+
+#drive.mount('/content/drive')
+#!mkdir model
+#!cp "/content/drive/My Drive/Colab Notebooks/export.pkl" "model/export.pkl"
+
+train = pd.read_csv("train.csv")
+learn = load_learner("model")
+
+correct = 0 
+counter = 0
+new = train[['text', 'label']]
+for text, answer in new.values:
+  output = learn.predict(text)
+  counter +=1 
+  label = str(output[0])
+  print(label, answer)
+  
+  if int(answer) == int(label):
+    correct += 1
+  if counter == 100:
+    print(correct)
+    break
