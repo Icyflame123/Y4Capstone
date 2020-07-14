@@ -1,0 +1,63 @@
+#Flask App
+import fastai
+from fastai.text import * 
+import pandas as pd
+import numpy as np
+from functools import partial
+import io
+import os
+from flask_ngrok import run_with_ngrok
+from flask import Flask, render_template, request, redirect, url_for
+
+#Google Colab commands
+#from google.colab import drive
+#drive.mount('/content/drive')
+#!mkdir templates
+#!cp "/content/drive/My Drive/Colab Notebooks/detector.html" "templates/detector.html"
+#!cp "/content/drive/My Drive/Colab Notebooks/result.html" "templates/result.html"
+#!cp "/content/drive/My Drive/Colab Notebooks/aboutus.html" "templates/aboutus.html"
+#!mkdir static
+#!cp "/content/drive/My Drive/Colab Notebooks/general.css" "static/general.css"
+#!mkdir model
+#!cp "/content/drive/My Drive/Colab Notebooks/export.pkl" "model/export.pkl"
+
+learn = load_learner("/content/model")
+
+#Function for predicting reliability of news article
+def prdct(text):
+  output = learn.predict(text)
+  label = str(output[0])
+  if label =='1':
+    return "FAKE"
+  else:
+    return "TRUE"
+
+app = Flask(__name__)
+run_with_ngrok(app)   #starts ngrok when the app is run
+
+@app.route("/", methods = ['GET', 'POST'])
+#About us page 
+def home():
+    return render_template("aboutus.html")
+
+@app.route("/detector", methods = ['GET', 'POST'])
+#Page that takes in news article
+def detector():
+    if request.method == "POST":
+        #Take in details about news article
+        title = request.form.get("title")
+        txt = request.form.get("txt")
+
+        return redirect(url_for("result", prediction = txt, title=title))
+
+    return render_template("detector.html")
+
+@app.route("/result/<prediction>/<title>", methods = ['GET'])
+#Page that shows predictions
+def result(prediction, title):
+    fakeness = prdct(prediction)
+    print(fakeness)
+    return render_template("result.html", prediction=fakeness, title = title, txt=prediction)
+
+
+app.run()
