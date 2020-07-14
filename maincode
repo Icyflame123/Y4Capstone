@@ -21,7 +21,7 @@ from flask import Flask, render_template, request, redirect, url_for
 #!mkdir model
 #!cp "/content/drive/My Drive/Colab Notebooks/export.pkl" "model/export.pkl"
 
-learn = load_learner("/content/model")
+learn = load_learner("model")
 
 #Function for predicting reliability of news article
 def prdct(text):
