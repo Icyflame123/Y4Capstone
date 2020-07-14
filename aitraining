@@ -1,0 +1,92 @@
+import fastai
+from fastai import *
+from fastai.text import * 
+import pandas as pd
+import numpy as np
+from functools import partial
+import io
+import os
+#from google.colab import files
+from os import walk
+
+#Download dataset
+#files.upload() 
+#!pip install -q kaggle
+#!mkdir -p ~/.kaggle
+#!cp kaggle.json ~/.kaggle/
+#!ls ~/.kaggle
+#!chmod 600 /root/.kaggle/kaggle.json 
+#!kaggle datasets download clmentbisaillon/fake-and-real-news-dataset -p /content/gdrive/My\ Drive/kaggle/fakenews
+#!mkdir data  #create a directory named data/
+#!unzip -q /content/gdrive/My\ Drive/kaggle/fakenews/fake-and-real-news-dataset.zip -d data/  #unzip data
+
+for dirname, _, filenames in os.walk('/content/data'):
+    for filename in filenames:
+        print(os.path.join(dirname, filename))
+        
+true = pd.read_csv("/content/data/True.csv")
+false = pd.read_csv("/content/data/Fake.csv")
+true["category"] = 1 #News is true if it has a category of 1
+false["category"] = 0 #News is false if it has a category of 0
+
+#Manipulate dataset
+dataset = pd.concat([false,true]) #Merging the 2 datasets
+df = pd.DataFrame({'label':dataset.category, 'text':dataset.text})
+df = df[df['label'].isin([0,1])]
+df.head()
+
+data = df[['label', 'text']]
+data.rename(columns={'label':'target'}, inplace=True)
+data.dropna(inplace=True)
+print(data.shape)
+df.groupby('label').size()
+
+data_lm = (TextList.from_df(data, cols='text')
+ .split_by_rand_pct(0.2)
+ .label_for_lm()
+ .databunch())
+data_lm.show_batch(2)
+
+#TRAIN LANGUAGE MODEL
+learn = language_model_learner(data_lm, AWD_LSTM, drop_mult=0.7)
+
+learn.lr_find()
+learn.recorder.plot()
+learn.fit_one_cycle(4, 3e-02, moms=(0.8, 0.7))
+
+learn.unfreeze()
+learn.lr_find()
+learn.recorder.plot(skip_end=15)
+learn.fit_one_cycle(3, 3e-04, moms=(0.8, 0.7))
+
+learn.save_encoder('ft_enc')
+
+#TRAIN DATA CLASSIFIER
+data_clas = (TextList.from_df(data, cols='text', vocab=data_lm.vocab)
+ .split_by_rand_pct(0.2)
+ .label_from_df('target')
+ .databunch())
+data_clas.show_batch(10)
+
+learn = text_classifier_learner(data_clas, AWD_LSTM, drop_mult=0.5)
+learn.load_encoder('ft_enc')
+
+learn.lr_find()
+learn.recorder.plot()
+learn.fit_one_cycle(4, 3e-03, moms=(0.8,0.7))
+
+#Test prediction
+output = learn.predict('When the Green Bay Packers lost to the Washington Redskins in Week 11, dropping to   Aaron Rodgers vowed to â€œrun the tableâ€ in a march to the playoffs. With a   victory over the Detroit Lions on Sunday night, the team fulfilled Rodgersâ€™ promise. Much of the drama of the matchup between division rivals was eliminated earlier in the day when the Redskins lost to the Giants, thus guaranteeing both the Packers and Lions would be playoff teams, but the N. F. C. North bragging rights, and a home game in the first round of the playoffs, were sufficient motivation for Green Bay to push hard enough to secure the teamâ€™s sixth consecutive win and the third consecutive loss for Detroit. Pundits had spent the week deciphering all of the wild scenarios that could play out for positioning among the remaining teams. But when all was said and done, ten of the teams that were in line for a playoff spot remained in the same seeding order. No. 6 Detroit Lions at No. 3 Seattle Seahawks Time: 8:15 p. m. Eastern SATURDAY on NBC The Seahawksâ€™ title hopes took a crushing blow when Earl Thomas was lost for the season with a broken leg. After the injury, the Seahawks went   with the wins coming with major asterisks as they came against the   Rams and 49ers. That collapse paled in comparison to the Lions, who lost their final three games, blowing what had been a large division lead against Green Bay. Line: Seahawks   ( : 43) No. 5 Giants at No. 4 Green Bay Packers Time: 4:40 p. m. Eastern SUNDAY on Fox Thanks to playing in the N. F. C. East, home of the   Dallas Cowboys, the Giants managed to tie Atlanta for the   record in the N. F. C. but got stuck with the No. 5 seed in the playoffs and a road game against a   Packers squad that won its final six games. The good news for the Giants is that superstitious fans will note that the last two times they played the Packers on the road in the playoffs, they not only won the games but went on to win the Super Bowl both times. Line: Packers   ( : 44. 5) Bye weeks: Dallas, Atlanta No. 5 Oakland Raiders at No. 4 Houston Texans Time: 4:35 p. m. Eastern SATURDAY on ESPN Line: Texans   ( : 37) The Texans were the least inspiring of the N. F. L. â€™s division champions and that was complicated further when Tom Savage, whom the team had elevated to starting quarterback after the benching of Brock Osweiler, was forced to leave Week 17â€™s loss to Tennessee with a concussion. As bad as that sounds, it may still be enough against a reeling Oakland squad that lost Derek Carr to a broken leg in Week 16, Matt McGloin to a shoulder injury in Week 17, and fell all the way from the No. 2 seed in the A. F. C. to No. 5. It is unclear at this point if McGloin or rookie Connor Cook will start at quarterback against Houston. No. 6 Miami Dolphins at No. 3 Pittsburgh Steelers Time: 1:05 p. m. Eastern SUNDAY on CBS The Dolphins were a contender when the teamâ€™s quarterback, Ryan Tannehill, was lost in Week 14 with injured ligaments in his left knee. Thanks to backup quarterback Matt Moore, and Jay Ajayi, the teamâ€™s   running back, they won two of three games and secured a   berth. But going up against a   offense like Pittsburgh is a tough test for Miamiâ€™s middling defense, even if Tannehillâ€™s knee heals enough to allow him to return. Line: Steelers  .5 ( : 47. 5) Bye weeks: New England, Kansas City With four teams vying for two N. F. C. playoff spots, all eyes were on the   game on Sunday. A Redskins victory could have caused movement in the seedings, with the Lions and Packers playing a     evening matchup. The Giants, who had already locked up the No. 5 seed and had nothing to gain, threw a wrench in the Redskinsâ€™ plans, eliminating their division rivals with a decisive   victory. With the drama essentially taken out of the N. F. C. all of the playoff movement Sunday occurred in the A. F. C. where there was a   at the top of the standings in the A. F. C. West. Just a week after losing Derek Carr, the teamâ€™s quarterback and a legitimate candidate for most valuable player, to a broken leg, the Oakland Raiders were crushed   by the Denver Broncos. That, combined with the Kansas City Chiefsâ€™   victory over the San Diego Chargers vaulted the Chiefs from a   spot all the way to the No. 2 seed in the A. F. C. which comes with a   bye in the playoffs. The loss for Oakland added to the misery of the Raiders, who have gone from Super Bowl contenders last week to a   team that will play on the road in Houston next week potentially with a   quarterback under center as Carrâ€™s backup, Matt McGloin, injured his shoulder in the loss to the Broncos. Beyond the switch to the Chiefs as the No.   in the A. F. C. it was business as usual for the teams that will get bye weeks in the playoffs. The New England Patriots secured the No. 1 spot in the A. F. C. with a win over Miami, the Dallas Cowboys were already guaranteed the No. 1 spot in the N. F. C. before their loss to Philadelphia, and the Atlanta Falcons held onto the No. 2 seed in the N. F. C. with a   win over New Orleans. The only remaining chance for a minor   was for the Packers, who led their division by virtue of a tiebreaker, to lose to the Lions, which would have forced them to play on the road in the   round of the playoffs. But the    aspect of the de facto N. F. C. North championship went away when the Redskins lost to the Giants, which eliminated the Redskins from   contention. While most of the races were straight forward, one of the crazier playoff scenarios that had been discussed before the week was the possibility that the Tampa Bay Buccaneers could find themselves in the playoffs. They simply had to shoot the moon by beating the Carolina Panthers, having the Redskins tie the Giants, the Packers lose to the Lions, and should all of that happen they simply required wins by Indianapolis, Dallas, Tennessee and San Francisco to top the Packers in strength of schedule. Tampa Bay took care of their end by beating the Panthers early in the day, but they were eliminated officially when Dallas lost to Philadelphia.')
+print(output)
+label = str(output[0])
+if label == '1':
+    print("ML predicts your sentence is false")
+else:
+    print("ML predicts your sentence is true")
+    
+#Export classifier
+learn.export('export.pkl')
+
+#from google.colab import drive
+#drive.mount('/content/drive')
+#!mv "export.pkl" "/content/drive/My Drive/Colab Notebooks"
