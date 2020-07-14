@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+      <title>Results page</title>
+      <link rel="stylesheet" href="{{url_for('.static', filename='general.css')}}">
+  </head>
+  <div class="topnav">
+      <a class="active" href="/">Home</a>
+      <a href="/detector">Fake News Detector</a>
+  </div>
+  <body>
+    
+  
+    <h1>Prediction complete! News article has been processed</h1>
+    <h3>Title: {{ title }}</h3>
+    <p>{{ txt }}</p>
+    <p>The model determined this article to be {{ prediction }}</p>
+
+
+
+
+
+  </body>
+</html>
