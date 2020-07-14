@@ -25,12 +25,12 @@ learn = load_learner("/content/model")
 
 #Function for predicting reliability of news article
 def prdct(text):
-  output = learn.predict(text)
-  label = str(output[0])
-  if label =='1':
-    return "FAKE"
-  else:
-    return "TRUE"
+    output = learn.predict(text)
+    label = str(output[0])
+    if label =='1':
+        return "FAKE"
+    else:
+        return "TRUE"
 
 app = Flask(__name__)
 run_with_ngrok(app)   #starts ngrok when the app is run
